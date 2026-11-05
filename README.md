@@ -7,7 +7,7 @@ A free, open-source tool for modeling chemical reaction networks in Python.  Off
 * uses Pint for units throughout
 * easy definition of 1D, 2D or 3D compartment arrays
 * can visualize compartment connectivity as graphs (NetworkX)
-* ligand rebinding near a target (`Vicinity`, ODE only)
+* pharmacokinetic and pharmacodynamic (PK/PD) modeling
 
 ## Dependencies
 * NetworkX
