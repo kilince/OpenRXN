@@ -1,5 +1,5 @@
 # OpenRXN
-A free, open-source tool for modeling chemical reaction networks in Python.  Offers a single platform for pharmacokinetics, pharmacodynamics, and reaction-diffusion equations. 
+An open-source tool for modeling chemical reaction networks in Python.  Offers a single platform for pharmacokinetics, pharmacodynamics, and reaction-diffusion equations. 
 
 ## Features
 * definition of compartments, reactions and species as Python objects
