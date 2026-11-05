@@ -344,7 +344,8 @@ def test_to_graph_returns_compartment_graph():
 
 
 def test_to_graph_keeps_inter_array_links():
-    """Links to a stacked array appear as one-way edges to that array's compartments."""
+    """Links to a stacked array appear as one-way edges to that array's compartments.
+    """
     a, b, old, inter = _stacked_pair()
     g = a.to_graph()
     assert set(g.nodes) == {"a-0", "a-1", "a-2", "b-0", "b-1", "b-2"}
