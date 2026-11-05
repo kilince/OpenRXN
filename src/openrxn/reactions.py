@@ -67,13 +67,6 @@ class Vicinity(object):
         if k_drift <= 0:
             raise ValueError("Error!  k_drift must be positive")
 
-        self.ID = ID
-        self.ligand = ligand
-        self.k_drift = k_drift
-
-    def __repr__(self):
-        return f"Vicinity({self.ID})"
-
 class Reaction(object):
     """
     A reaction describes how reactants and products are related.
