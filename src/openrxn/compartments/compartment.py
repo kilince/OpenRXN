@@ -71,7 +71,7 @@ class Compartment(object):
             self_tag = make_ID(self.array_ID,self.ID)
             logging.warning("Connection to remove between {0} and {1} does not exist".format(self_tag,conn_tag))
 
-        val = self.connections.pop(conn_tag)
+        self.connections.pop(conn_tag, None)
 
     def copy(self,ID=None,delete_array_ID=False):
         """Returns an identical copy of this compartment."""
@@ -143,23 +143,32 @@ class Compartment3D(Compartment):
 class Reservoir(Compartment):
     """
     A compartment with a fixed concentration of different species.
+
+    concs : dict of species ID -> number density (convertible to 1/nm**3)
+    conc_funcs : dict of species ID -> f(t) returning molecules/nm**3 as a float
+
+    Constant concentrations (from concs) are also kept in self.const_concs
+    (molecules/nm**3); GillespieSystem supports only these.
     """
 
     def __init__(self, *args, concs={}, conc_funcs={}, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.conc_funcs = {}
+        self.const_concs = {}
 
         # add keys from concs into self.conc_funcs
         for key in concs.keys():
-            # convert concentrations to number of molecules per
-            # nanometer**3
-            concs[key].ito(1/unit.nm**3)
+            # plain float in molecules per nm**3, since the ODE RHS adds it to floats
+            conc_val = concs[key].to(1/unit.nm**3).magnitude
+            self.const_concs[key] = conc_val
 
-            ## define a concentration function and attach it
-            def tmp_conc_func(t):
-                return concs[key].ito(1/unit.nm**3)
-            
+            ## define a concentration function and attach it.
+            # bind conc_val via a default argument so each closure keeps its
+            # own value (otherwise late binding makes them all use the last key).
+            def tmp_conc_func(t, _val=conc_val):
+                return _val
+
             self.conc_funcs[key] = tmp_conc_func
 
         # add keys from conc_funcs into self.conc_funcs
@@ -182,6 +191,9 @@ class Reservoir(Compartment):
         else:
             new_aID = self.array_ID
 
-        new_comp = Reservoir(newID, array_ID=new_aID, conc_funcs=self.conc_funcs)
+        # connections/reactions are not copied, so a flattened reservoir stays a fixed source
+        new_comp = Reservoir(newID, pos=self.pos, array_ID=new_aID, volume=self.volume,
+                             conc_funcs=self.conc_funcs)
+        new_comp.const_concs = dict(self.const_concs)
             
         return new_comp

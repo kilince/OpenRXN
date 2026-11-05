@@ -43,6 +43,37 @@ class Species(object):
     def __repr__(self):
         return f"Species({self.ID})"
 
+class Vicinity(object):
+    """
+    Quasi-steady-state vicinity of a target, for ligand rebinding (Vauquelin 2016,
+    Table 1 eq. 7). Ligand released into the vicinity by a tagged reaction escapes
+    to the bulk at k_drift or is recaptured by a tagged reaction that consumes it.
+    Tag one reaction for its own vicinity, or several reactions with the same
+    Vicinity to share one (cross-capture). Supported by ODESystem only.
+
+    Parameters
+    ----------
+    ID : str
+        Unique identifier for the vicinity.
+    ligand : Species
+        Species that is released into and recaptured from the vicinity.
+    k_drift : Quantity
+        Escape rate from the vicinity to the bulk (1/s).
+    """
+
+    def __init__(self, ID, ligand, k_drift):
+        if not isinstance(ligand, Species):
+            raise TypeError("Vicinity ligand must be a Species object")
+        if k_drift <= 0:
+            raise ValueError("Error!  k_drift must be positive")
+
+        self.ID = ID
+        self.ligand = ligand
+        self.k_drift = k_drift
+
+    def __repr__(self):
+        return f"Vicinity({self.ID})"
+
 class Reaction(object):
     """
     A reaction describes how reactants and products are related.
@@ -62,10 +93,13 @@ class Reaction(object):
     kf: float, optional
         Forward rate constant. 
     kr: float, optional
-        Reverse rate constant. 
+        Reverse rate constant.
+    vicinity: Vicinity, optional
+        Rebinding vicinity of this reaction. Its ligand must appear once, with
+        stoichiometry 1, on one side of the reaction.
     """
 
-    def __init__(self, ID, reactants, products, stoich_r, stoich_p, kf=0, kr=0):
+    def __init__(self, ID, reactants, products, stoich_r, stoich_p, kf=0, kr=0, vicinity=None):
         self.ID = ID
 
         if len(reactants) != len(stoich_r):
@@ -93,6 +127,14 @@ class Reaction(object):
 
         self.reactant_IDs = [s.ID for s in self.reactants]
         self.product_IDs = [s.ID for s in self.products]
+
+        if vicinity is not None:
+            lig = vicinity.ligand.ID
+            n_lig = [n for s, n in zip(self.reactant_IDs, stoich_r) if s == lig] + \
+                    [n for s, n in zip(self.product_IDs, stoich_p) if s == lig]
+            if n_lig != [1]:
+                raise ValueError("Vicinity ligand must appear once, with stoichiometry 1, on one side of the reaction")
+        self.vicinity = vicinity
 
     def _expected_unit_from_order(self, stoich):
 

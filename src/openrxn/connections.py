@@ -16,12 +16,42 @@ and this is what is stored in the connection objects.
 """
 
 from . import unit
+import copy
 import logging
 
 class Connection(object):
     """Basis class for connections.  The argument species_rates
     is a dictionary, with Species IDs as keys and values hold 
-    rate constant tuples (k12,k21)."""
+    rate constant tuples (k12,k21).
+
+    A connection object describes one direction of a link: when
+    compartment 1 connects to compartment 2 with rates (k12,k21), the
+    link from 2 back to 1 must carry (k21,k12), i.e. self.reverse().
+    Using the same object for both directions conserves mass only when
+    k12 == k21 (see is_symmetric)."""
+
+    species_rates: dict   # set by subclasses that hold rate tuples
+
+    def reverse(self):
+        """Return the connection for the opposite direction of the link
+        (out/in rates swapped).  Connections without rate tuples
+        (unresolved FicksConnection/ResConnection) and connections with
+        equal rates both ways are their own reverse, so they are returned
+        unchanged."""
+        rates = getattr(self, 'species_rates', None)
+        if rates is None or self.is_symmetric():
+            return self
+        new = copy.copy(self)
+        new.species_rates = {s: (r[1], r[0]) for s, r in rates.items()}
+        return new
+
+    def is_symmetric(self):
+        """True when every species has the same rate in both directions,
+        so one object can serve both directions of a link."""
+        rates = getattr(self, 'species_rates', None)
+        if rates is None:
+            return True
+        return all(r[0] == r[1] for r in rates.values())
 
 class AnisotropicConnection(Connection):
     
@@ -70,11 +100,12 @@ class AnisotropicConnection(Connection):
         for s,r in self.species_rates.items():
             rev_species_rates[s] = self._flip_tuple(r)
 
-        return AnisotropicConnection(rev_species_rates)
+        return AnisotropicConnection(rev_species_rates,dim=self.dim)
 
     def __repr__(self):
         rates = {s: (k[0].magnitude, k[1].magnitude) for s, k in self.species_rates.items()}
-        unit_str = str(next(iter(self.species_rates.values()))[0].units)
+        # no species: no unit to show
+        unit_str = str(next(iter(self.species_rates.values()))[0].units) if self.species_rates else ""
         return (f"AnisotropicConnection(dim={self.dim},"
                 f"n_species={len(self.species_rates)},"
                 f"transport_rates={rates}{unit_str})"
@@ -112,7 +143,8 @@ class IsotropicConnection(Connection):
 
     def __repr__(self):
         rates = {s: (k[0].magnitude, k[1].magnitude) for s, k in self.species_rates.items()}
-        unit_str = str(next(iter(self.species_rates.values()))[0].units)
+        # no species: no unit to show
+        unit_str = str(next(iter(self.species_rates.values()))[0].units) if self.species_rates else ""
         return (f"IsotropicConnection(dim={self.dim},"
                 f"n_species={len(self.species_rates)},"
                 f"transport_rates={rates}{unit_str})"
@@ -204,7 +236,7 @@ class FicksConnection(Connection):
         self.dim = dim
 
     def resolve(self):
-        """This returns an IsotropicConnection that does not 
+        """This returns a DivByVConnection that does not 
         require any information about the Species, or the arrays"""
 
         if self.surface_area is None or self.ic_distance is None:
@@ -234,6 +266,8 @@ class ResConnection(Connection):
             Reservoir interface area A (units convertible to L^(dim-1)).
         ic_distance : Quantity, optional
             Distance DeltaX from compartment center to reservoir boundary (units convertible to L).
+            If omitted, Model.flatten uses half the compartment width along `face`
+            (the reservoir concentration is held at the shared face).
         dim : int, optional
             Spatial dimension.
         face : str({'x','y','z'}) or None, optional
@@ -248,7 +282,7 @@ class ResConnection(Connection):
         self.face = face
 
     def resolve(self):
-        """This returns an AnisotropicConnection that does not 
+        """This returns a DivByVConnection that does not 
         require any information about the Species, or the arrays"""
 
         if self.surface_area is None or self.ic_distance is None:
